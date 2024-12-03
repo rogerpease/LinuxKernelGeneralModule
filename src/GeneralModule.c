@@ -7,6 +7,9 @@
 
 /* This is a "hodgepodge" module meant to keep notes on how various things work. */ 
 
+#ifndef TIMER_INTERRUPT
+   Define timer interrupt. Use 19 for VM ubuntu, 117 for khadas board. 
+#endif
 
 /* Interrupts */ 
 #include <linux/interrupt.h>
@@ -74,9 +77,10 @@ static my_fancy_interrupt_data_t * my_fancy_interrupt_data_p;
 static int printintcount(struct seq_file *m,void *v) {  
 
     // Generally a good practice to do only what is absolutely necessary in interrupts. 
+    int count; 
 
     spin_lock  (&my_fancy_interrupt_data_p->interrupt_lock);
-    int count = my_fancy_interrupt_data_p->interrupt_count;
+    count = my_fancy_interrupt_data_p->interrupt_count;
     spin_unlock(&my_fancy_interrupt_data_p->interrupt_lock);
 
     seq_printf (m,"Interrupt count %d\n",count);
@@ -88,10 +92,12 @@ static int printintcount(struct seq_file *m,void *v) {
 
 static int intcount_open(struct inode *inode, struct file *filp) {
 
+    char buf[INTCOUNT_BUFLEN]; 
+
     pr_info("Opened %s",filp->f_path.dentry->d_iname);
 
-    char buf[INTCOUNT_BUFLEN]; 
     dentry_path_raw(filp->f_path.dentry,buf,INTCOUNT_BUFLEN);
+
     pr_info("Full path %s", buf);
 
     return single_open(filp, printintcount, NULL);
@@ -128,6 +134,10 @@ irqreturn_t my_int_handler(int i, void * p)
 
 static int __init my_module_init(void)
 {
+
+     int result; 
+     struct proc_dir_entry *file;
+
      pr_info("Option 1 %s\n", option1);
      pr_info("Change with: insmod GeneralModule option1='something_brilliant'\n");
 
@@ -135,7 +145,6 @@ static int __init my_module_init(void)
      /* When you open to read it, you get a list of processes. */ 
      /* When you open to write it, nothing. */ 
       
-     struct proc_dir_entry *file;
 
      file = proc_create(GENERALMODULE_PROCESSLIST, 0, NULL, &processlist_ops);
      if (file == NULL) { 
@@ -159,7 +168,8 @@ static int __init my_module_init(void)
 
      memset(my_fancy_interrupt_data_p,0,sizeof(my_fancy_interrupt_data_t));
      
-     int result = request_irq( 19, my_int_handler, IRQF_SHARED, 
+
+     result = request_irq(TIMER_INTERRUPT, my_int_handler, IRQF_SHARED, 
                  "MY_SHARED_INT", my_fancy_interrupt_data_p);
   
      pr_info("Request IRQ result %d\n",result);
@@ -187,7 +197,7 @@ static void __exit my_module_exit(void)
 {
     remove_proc_entry(GENERALMODULE_PROCESSLIST, NULL);
     remove_proc_entry(GENERALMODULE_INTCOUNT, NULL);
-    free_irq(19,my_fancy_interrupt_data_p);
+    free_irq(TIMER_INTERRUPT,my_fancy_interrupt_data_p);
 }
 
 module_init(my_module_init);
