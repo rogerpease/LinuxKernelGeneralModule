@@ -3,10 +3,12 @@
 #include <linux/cdev.h>
 #include <linux/fs.h>
 #include <asm/uaccess.h>
+#include <linux/workqueue.h>
 #include <linux/string.h> 
 
 /* This is a "hodgepodge" module meant to keep notes on how various things work. */ 
 
+#define TIMER_INTERRUPT (19)
 #ifndef TIMER_INTERRUPT
    Define timer interrupt. Use 19 for VM ubuntu, 117 for khadas board. 
 #endif
@@ -132,6 +134,19 @@ irqreturn_t my_int_handler(int i, void * p)
 }
 
 
+struct delayed_work my_delayed_work_struct; 
+
+int work_delay = 5000;
+
+void my_delayed_work_function(struct work_struct *)
+{
+   pr_info("delayed work called");
+   work_delay += 1000;
+   pr_info("Extending delay to %d",work_delay);
+   schedule_delayed_work(&my_delayed_work_struct, work_delay);
+
+}
+
 static int __init my_module_init(void)
 {
 
@@ -167,10 +182,17 @@ static int __init my_module_init(void)
      if (file == NULL) { goto cleanup1; }
 
      memset(my_fancy_interrupt_data_p,0,sizeof(my_fancy_interrupt_data_t));
-     
 
      result = request_irq(TIMER_INTERRUPT, my_int_handler, IRQF_SHARED, 
                  "MY_SHARED_INT", my_fancy_interrupt_data_p);
+
+      
+     INIT_DELAYED_WORK(&my_delayed_work_struct, my_delayed_work_function); 
+     schedule_delayed_work(&my_delayed_work_struct, work_delay);
+
+
+
+
   
      pr_info("Request IRQ result %d\n",result);
      if (result < 0) 
